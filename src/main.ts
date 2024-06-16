@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common'
 // import * as cors from 'cors'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import path from 'path'
+import { JwtExceptionFilter } from './auth/guards/jwt-exception.filter'
 // import * as fs from 'fs'
 // import * as https from 'https'
 
@@ -16,6 +17,8 @@ async function bootstrap() {
     //   cert: fs.readFileSync('./bundle.crt'),
     // },
   })
+  app.useGlobalFilters(new JwtExceptionFilter())
+
   app.useGlobalPipes(new ValidationPipe())
   app.enableCors({
     origin: true,

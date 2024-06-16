@@ -21,39 +21,55 @@ export class AuthService {
 
   async login(loginPayloadDto: LoginPayloadDto) {
     // Validate user credentials
+
     const user = await this.validateUser(loginPayloadDto)
+
     if (!user) {
       throw new UnauthorizedException('Invalid credentials')
     }
     // Generate tokens
-    const accessToken = this.jwtService.sign({ userName: user.userName })
+    const accessToken = this.jwtService.sign({ userName: user.userName, role: user.role })
     const refreshToken = this.jwtService.sign(
-      { userName: user.userName },
+      { userName: user.userName, role: user.role },
       {
-        expiresIn: process.env.JWT_REFRESH_EXPIRATION_TIME,
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION_TIME'),
       },
     )
     return { user, accessToken, refreshToken }
   }
 
-  private async validateUser(loginPayloadDto: LoginPayloadDto): Promise<UserEntity | null> {
+  async validateUser(loginPayloadDto: LoginPayloadDto): Promise<UserInformationEntity | null> {
     // Find user by userName
     const user = await this.userRepository.findOne({ where: { userName: loginPayloadDto.userName } })
-    const userHashPassword = await this.hashPassword(user.password)
-    if (user && userHashPassword && bcrypt.compareSync(loginPayloadDto.password, userHashPassword)) {
-      // Fetch user information
+
+    if (user && bcrypt.compareSync(loginPayloadDto.password, user.password)) {
+      // Fetch user information'
+
       const userInfo = await this.userInformationRepository.findOne({ where: { userName: loginPayloadDto.userName } })
+
       if (userInfo) {
         user.userInformation = userInfo
       }
-      return user
+      console.log('user_find_2', user)
+
+      return userInfo
     }
     return null
   }
 
-  private async hashPassword(password: string): Promise<string> {
-    const saltRounds = this.configService.get<number>('BCRYPT_SALT_ROUNDS')
-    return await bcrypt.hash(password, saltRounds)
+  async findUser(userName: string): Promise<UserInformationEntity | null> {
+    try {
+      const user = await this.userRepository.findOne({ where: { userName } })
+      const userInfo = await this.userInformationRepository.findOne({ where: { userName } })
+      if (!user || !userInfo) {
+        return null
+      }
+
+      return userInfo
+    } catch (error) {
+      console.log(error)
+      return null
+    }
   }
 }

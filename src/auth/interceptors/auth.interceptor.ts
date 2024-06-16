@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Request } from 'express' // Import Request type if not already imported
+import { Role } from '../roles.enum'
 
 // Define a custom interface for extending Request object
 interface AuthenticatedRequest extends Request {
@@ -26,16 +27,19 @@ export class AuthInterceptor implements NestInterceptor {
       const accessToken = this.extractAccessToken(request.headers.authorization)
 
       // Verify and decode the access token
-      const decoded = this.jwtService.verify(accessToken) as { userName: string }
+      const decoded = this.jwtService.verify(accessToken) as { userName: string; role: Role }
 
       // Fetch user details from the database using userRepository
       const user = await this.userRepository.findOne({ where: { userName: decoded.userName } })
+      console.log('user_interceptor_1', user)
 
       if (!user) {
         throw new UnauthorizedException('User not found')
       }
 
       // Attach user information to the request
+      console.log('user_interceptor', user)
+
       request.user = user
 
       return next.handle()

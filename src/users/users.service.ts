@@ -24,7 +24,7 @@ export class UserService {
     createUserDto: CreateUserDto,
     avatarFile: Express.Multer.File,
     creator: string,
-  ): Promise<UserEntity> {
+  ): Promise<UserInformationEntity> {
     try {
       const { userName, password, ...userInfo } = createUserDto
       const existedUser = await this.userRepository.findOne({ where: { userName: userName } })
@@ -34,6 +34,8 @@ export class UserService {
       const hashedPassword = await this.hashPassword(password)
       const newUser = this.userRepository.create({ userName, password: hashedPassword })
 
+      console.log('newUser', newUser)
+
       // Save user to the database
       await this.userRepository.save(newUser)
 
@@ -41,7 +43,7 @@ export class UserService {
       let avatarPath = await this.saveAvatar(userName, avatarFile)
 
       // Create user information
-      const newUserInformation = this.userInformationRepository.create({
+      let newUserInformationData = {
         ...userInfo,
         userName,
         isActive: createUserDto.isActive === '1',
@@ -50,12 +52,15 @@ export class UserService {
         updateDate: new Date(),
         updateBy: creator,
         avatar: avatarPath,
-      })
+      }
+      console.log('newUserInformationData', newUserInformationData)
+
+      const newUserInformation = this.userInformationRepository.create(newUserInformationData)
 
       // Save user information to the database
       await this.userInformationRepository.save(newUserInformation)
 
-      return newUser
+      return newUserInformation
     } catch (error) {
       console.log(error)
       return null

@@ -27,8 +27,8 @@ import { RESPONSE_TYPE } from 'src/types/commom'
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @Post()
   @UseInterceptors(FileInterceptor('avatar'))
   async createAccount(
@@ -44,6 +44,9 @@ export class UserController {
       let requester = req?.user?.userName ?? 'Developer'
 
       console.log(requester)
+      console.log('----------------')
+      console.log(req)
+      console.log('----------------')
 
       let newUser = await this.userService.createAccount(createUserDto, avatar, requester)
       if (newUser === null) {

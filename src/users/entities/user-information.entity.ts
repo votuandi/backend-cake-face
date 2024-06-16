@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToOne, JoinColumn } from 'typeorm'
+import { Entity, Column, PrimaryGeneratedColumn, OneToOne } from 'typeorm'
 import { UserEntity } from './user.entity'
 import { Role } from 'src/auth/roles.enum'
 
@@ -28,7 +28,7 @@ export class UserInformationEntity {
   @Column({ nullable: true })
   updateBy: string
 
-  @Column()
+  @Column({ default: '' })
   note: string
 
   @Column()
@@ -47,6 +47,5 @@ export class UserInformationEntity {
   role: Role
 
   @OneToOne(() => UserEntity, (user) => user.userInformation)
-  @JoinColumn({ name: 'userName' })
   user: UserEntity
 }
