@@ -79,13 +79,15 @@ export class UserService {
   }
 
   async getUserInformation(userName: string): Promise<UserInformationEntity> {
-    const userInformation = await this.userInformationRepository.findOne({ where: { userName } })
-
-    if (!userInformation) {
-      throw new NotFoundException(`User with userName ${userName} not found`)
+    try {
+      const userInformation = await this.userInformationRepository.findOne({ where: { userName } })
+      if (!userInformation) {
+        return undefined
+      }
+      return userInformation
+    } catch (error) {
+      return null
     }
-
-    return userInformation
   }
 
   async getUserList(): Promise<UserInformationEntity[]> {

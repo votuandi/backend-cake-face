@@ -1,5 +1,5 @@
 import { LoginPayloadDto } from './dto/auth.dto'
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -21,21 +21,18 @@ export class AuthService {
 
   async login(loginPayloadDto: LoginPayloadDto) {
     // Validate user credentials
-
     const user = await this.validateUser(loginPayloadDto)
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials')
     }
     // Generate tokens
-    const accessToken = this.jwtService.sign({ userName: user.userName, role: user.role })
-    const refreshToken = this.jwtService.sign(
-      { userName: user.userName, role: user.role },
-      {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION_TIME'),
-      },
-    )
+    const tokenPayload = { userName: user.userName, role: user.role }
+    const accessToken = this.jwtService.sign(tokenPayload)
+    const refreshToken = this.jwtService.sign(tokenPayload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION_TIME'),
+    })
     return { user, accessToken, refreshToken }
   }
 
@@ -51,11 +48,34 @@ export class AuthService {
       if (userInfo) {
         user.userInformation = userInfo
       }
-      console.log('user_find_2', user)
 
       return userInfo
     }
     return null
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      })
+
+      const user = await this.findUser(payload.userName)
+      if (!user) {
+        throw new ForbiddenException('User not found')
+      }
+
+      const tokenPayload = { userName: user.userName, role: user.role }
+      return {
+        accessToken: this.jwtService.sign(tokenPayload),
+        refreshToken: this.jwtService.sign(tokenPayload, {
+          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION_TIME'),
+        }),
+      }
+    } catch (e) {
+      throw new ForbiddenException('Invalid refresh token')
+    }
   }
 
   async findUser(userName: string): Promise<UserInformationEntity | null> {

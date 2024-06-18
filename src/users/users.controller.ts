@@ -38,15 +38,7 @@ export class UserController {
     @Res() res: Response,
   ) {
     try {
-      console.log('createUserDto', createUserDto)
-      // console.log('avatar', avatar)
-
       let requester = req?.user?.userName ?? 'Developer'
-
-      console.log(requester)
-      console.log('----------------')
-      console.log(req)
-      console.log('----------------')
 
       let newUser = await this.userService.createAccount(createUserDto, avatar, requester)
       if (newUser === null) {
@@ -86,9 +78,12 @@ export class UserController {
     return this.userService.updateUserInformation(userName, updateUserDto)
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get(':userName')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Get('/get-info/:userName')
   async getUserInformation(@Param('userName') userName: string) {
+    console.log('userName', userName)
+
     return this.userService.getUserInformation(userName)
   }
 
@@ -97,5 +92,41 @@ export class UserController {
   @Get()
   async getUserList() {
     return this.userService.getUserList()
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('get-info')
+  async getUserInfo(@Request() req, @Res() res: Response) {
+    try {
+      let userInfo = await this.userService.getUserInformation(req.user.userName)
+      console.log('userInfo', userInfo)
+
+      if (userInfo === null) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Internal Server Error',
+        }
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+      } else if (userInfo === undefined) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'User not found',
+        }
+        res.status(HttpStatus.BAD_REQUEST).json(response)
+      } else {
+        let response: RESPONSE_TYPE = {
+          status: true,
+          message: "Get user's information successfully",
+          params: userInfo,
+        }
+        res.status(HttpStatus.OK).json(response)
+      }
+    } catch (error) {
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'Internal Server Error',
+      }
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+    }
   }
 }
