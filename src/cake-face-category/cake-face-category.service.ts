@@ -51,7 +51,7 @@ export class CakeFaceCategoryService {
     try {
       let categoryList = await this.cakeFaceCategoryRepository.find({
         order: {
-          updateDate: 'ASC',
+          createDate: 'ASC',
         },
       })
       let newCategoryList: CakeFaceCategoryEntity[] = []
@@ -68,7 +68,7 @@ export class CakeFaceCategoryService {
     }
   }
 
-  async findOne(id: string): Promise<CakeFaceCategoryEntity | undefined | null> {
+  async findOne(id: number): Promise<CakeFaceCategoryEntity | undefined | null> {
     try {
       return await this.cakeFaceCategoryRepository.findOne({ where: { id } })
     } catch (error) {
@@ -77,9 +77,9 @@ export class CakeFaceCategoryService {
   }
 
   async update(
-    categoryId: string,
+    categoryId: number,
     updateCategoryDto: UpdateCakeFaceCategoryDto,
-    creator: string,
+    updater: string,
     thumbnail: Express.Multer.File | undefined,
   ): Promise<CakeFaceCategoryEntity | null> {
     try {
@@ -109,7 +109,7 @@ export class CakeFaceCategoryService {
         ...updateCategoryDto,
         thumbnail: newThumbnailPath,
         updateDate: updateTime,
-        updateBy: creator,
+        updateBy: updater,
         isActive: updateCategoryDto.isActive ? updateCategoryDto.isActive === '1' : oldData.isActive,
       }
       let updateRes = await this.cakeFaceCategoryRepository.update(categoryId, updatedCategory)
@@ -134,16 +134,18 @@ export class CakeFaceCategoryService {
     }
   }
 
-  private async saveThumbnail(time: string | number, avatarFile: Express.Multer.File) {
-    if (avatarFile) {
-      let savedAvatarName = `cfc_${time}_${generateRandomString(10)}.${avatarFile.originalname.split('.').reverse()[0]}`
+  private async saveThumbnail(time: string | number, thumbnailFile: Express.Multer.File) {
+    if (thumbnailFile) {
+      let savedAvatarName = `cfc_${time}_${generateRandomString(10)}.${
+        thumbnailFile.originalname.split('.').reverse()[0]
+      }`
       let savedThumbnailPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face-category', savedAvatarName)
       try {
         const folderPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face-category')
         if (!fs.existsSync(folderPath)) {
           fs.mkdirSync(folderPath, { recursive: true })
         }
-        fs.writeFileSync(savedThumbnailPath, avatarFile.buffer)
+        fs.writeFileSync(savedThumbnailPath, thumbnailFile.buffer)
       } catch (error) {
         console.log('Error when saving image: ', error)
         return null

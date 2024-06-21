@@ -99,7 +99,7 @@ export class CakeFaceCategoryController {
 
   @Get(':id')
   async findOne(@Param('id') id: string, @Res() res: Response) {
-    let category = await this.categoryService.findOne(id)
+    let category = await this.categoryService.findOne(Number(id))
     if (category === null) {
       let response: RESPONSE_TYPE = {
         status: false,
@@ -142,7 +142,7 @@ export class CakeFaceCategoryController {
         res.status(HttpStatus.FORBIDDEN).json(response)
       }
 
-      let category = await this.categoryService.update(id, updateCategoryDto, requester, thumbnail)
+      let category = await this.categoryService.update(Number(id), updateCategoryDto, requester, thumbnail)
 
       if (category === null) {
         let response: RESPONSE_TYPE = {

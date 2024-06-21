@@ -6,11 +6,17 @@ import { ConfigService, ConfigModule } from '@nestjs/config'
 import { UserModule } from './users/users.module'
 import { AuthModule } from './auth/auth.module'
 import { JwtService } from '@nestjs/jwt'
+import { CakeFaceCategoryModule } from './cake-face-category/cake-face-category.module'
+import { CakeFaceModule } from './cake-face/cake-face.module'
+import { CakeFaceOptionModule } from './cake-face-option/cake-face-option.module'
 
 @Module({
   imports: [
     UserModule,
     AuthModule,
+    CakeFaceCategoryModule,
+    CakeFaceModule,
+    CakeFaceOptionModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),

@@ -3,8 +3,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm'
 
 @Entity('cake_face_option')
 export class CakeFaceOptionEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
+  @PrimaryGeneratedColumn()
+  id: number
 
   @Column({ type: 'varchar', length: 50 })
   name: string

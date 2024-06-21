@@ -1,17 +1,20 @@
 import { Module } from '@nestjs/common'
-import { ArticleService } from './article.service'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { ArticleEntity } from 'src/entities/article.entity'
-import { ArticleController } from './article.controller'
-import { CategoryService } from '../category/category.service'
-import { CategoryEntity } from 'src/entities/category.entity'
-import { ArticleContentEntity } from 'src/entities/article-content.entity'
-import { ArticleContentService } from '../article-content/article-content.service'
 import { ConfigModule } from '@nestjs/config'
+import { CakeFaceEntity } from './cake-face.entity'
+import { CakeFaceOptionEntity } from 'src/cake-face-option/cake-face-option.entity'
+import { CakeFaceCategoryEntity } from 'src/cake-face-category/cake-face-category.entity'
+import { CakeFaceController } from './cake-face.controller'
+import { CakeFaceService } from './cake-face.service'
+import { CakeFaceOptionService } from 'src/cake-face-option/cake-face-option.service'
+import { CakeFaceCategoryService } from 'src/cake-face-category/cake-face-category.service'
 
 @Module({
-  imports: [ConfigModule.forRoot(), TypeOrmModule.forFeature([ArticleEntity, ArticleContentEntity, CategoryEntity])],
-  controllers: [ArticleController],
-  providers: [ArticleService, ArticleContentService, CategoryService],
+  imports: [
+    ConfigModule.forRoot(),
+    TypeOrmModule.forFeature([CakeFaceEntity, CakeFaceOptionEntity, CakeFaceCategoryEntity]),
+  ],
+  controllers: [CakeFaceController],
+  providers: [CakeFaceService, CakeFaceOptionService, CakeFaceCategoryService],
 })
-export class ArticleModule {}
+export class CakeFaceModule {}

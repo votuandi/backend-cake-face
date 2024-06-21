@@ -6,29 +6,49 @@ import {
   Param,
   Put,
   Delete,
+  Request,
   Res,
   HttpStatus,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
 } from '@nestjs/common'
-import { CategoryService } from './cake-face-option.service'
+import { CakeFaceOptionService } from './cake-face-option.service'
 import { Response } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { RESPONSE_TYPE } from 'src/types/commom'
+import { CreateCakeFaceOptionDto } from './dto/create-cake-face-option.dto'
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
+import { RolesGuard } from 'src/auth/guards/roles.guard'
+import { Role } from 'src/auth/roles.enum'
+import { Roles } from 'src/auth/roles.decorator'
+import { UpdateCakeFaceOptionDto } from './dto/update-cake-face-option.dto'
 
-@Controller('cake-face-category')
-export class CakeFaceCategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+@Controller('cake-face-option')
+export class CakeFaceOptionController {
+  constructor(private readonly categoryService: CakeFaceOptionService) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @Post()
-  @UseInterceptors(FileInterceptor('thumbnail'))
+  @UseInterceptors(FileInterceptor('image'))
   async create(
-    @UploadedFile() thumbnail: Express.Multer.File,
-    @Body() createCategoryDto: CreateCategoryDto,
+    @UploadedFile() image: Express.Multer.File,
+    @Body() createCategoryDto: CreateCakeFaceOptionDto,
+    @Request() req,
     @Res() res: Response,
   ) {
-    if (thumbnail) {
-      let newCategory = await this.categoryService.create(createCategoryDto, thumbnail)
+    let requester = req?.user?.userName
+    if (!requester) {
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'Permission deny',
+      }
+      res.status(HttpStatus.FORBIDDEN).json(response)
+    }
+
+    if (image) {
+      let newCategory = await this.categoryService.create(createCategoryDto, requester, image)
       if (newCategory === null) {
         let response: RESPONSE_TYPE = {
           status: false,
@@ -38,13 +58,13 @@ export class CakeFaceCategoryController {
       } else if (newCategory === undefined) {
         let response: RESPONSE_TYPE = {
           status: false,
-          message: 'Create category failed',
+          message: 'Create Cake Face Option Failed',
         }
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
       } else {
         let response: RESPONSE_TYPE = {
           status: true,
-          message: 'Create category successfully',
+          message: 'Create Cake Face Option Successfully',
           params: newCategory,
         }
         res.status(HttpStatus.CREATED).json(response)
@@ -78,7 +98,7 @@ export class CakeFaceCategoryController {
 
   @Get(':id')
   async findOne(@Param('id') id: string, @Res() res: Response) {
-    let category = await this.categoryService.findOne(id)
+    let category = await this.categoryService.findOne(Number(id))
     if (category === null) {
       let response: RESPONSE_TYPE = {
         status: false,
@@ -100,33 +120,53 @@ export class CakeFaceCategoryController {
     }
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @Put(':id')
-  @UseInterceptors(FileInterceptor('thumbnail'))
+  @UseInterceptors(FileInterceptor('image'))
   async update(
     @Param('id') id: string,
-    @UploadedFile() thumbnail: Express.Multer.File,
-    @Body() updateCategoryDto: UpdateCategoryDto,
+    @UploadedFile() image: Express.Multer.File,
+    @Body() updateOptionDto: UpdateCakeFaceOptionDto,
+    @Request() req,
     @Res() res: Response,
   ) {
-    let category = await this.categoryService.update(id, updateCategoryDto, thumbnail)
-    if (category === null) {
+    try {
+      let requester = req?.user?.userName
+      if (!requester) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Permission Deny',
+        }
+        res.status(HttpStatus.FORBIDDEN).json(response)
+      }
+
+      let option = await this.categoryService.update(Number(id), updateOptionDto, requester, image)
+      if (option === null) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Internal Server Error',
+        }
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+      } else if (option === undefined) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Cake Face Option Not Found',
+        }
+        res.status(HttpStatus.NOT_FOUND).json(response)
+      } else {
+        let response: RESPONSE_TYPE = {
+          status: true,
+          params: option,
+        }
+        res.status(HttpStatus.OK).json(response)
+      }
+    } catch (error) {
       let response: RESPONSE_TYPE = {
         status: false,
-        message: 'Internal Server Error',
+        message: 'Bad Request',
       }
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
-    } else if (category === undefined) {
-      let response: RESPONSE_TYPE = {
-        status: false,
-        message: 'Category not found',
-      }
-      res.status(HttpStatus.NOT_FOUND).json(response)
-    } else {
-      let response: RESPONSE_TYPE = {
-        status: true,
-        params: category,
-      }
-      res.status(HttpStatus.OK).json(response)
+      res.status(HttpStatus.BAD_REQUEST).json(response)
     }
   }
 

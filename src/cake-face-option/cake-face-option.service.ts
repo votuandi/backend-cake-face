@@ -2,57 +2,57 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { join } from 'path'
-import { ArticleContentEntity } from 'src/entities/article-content.entity'
-import { ArticleEntity } from 'src/entities/article.entity'
-import { CategoryEntity } from 'src/entities/category.entity'
 import { generateRandomString } from 'src/utils/helpers/common.helpers'
 import { Repository } from 'typeorm'
 import * as fs from 'fs'
-import { CreateCakeFaceCategoryDto } from './dto/create-cake-face-option.dto'
-import { UpdateCakeFaceCategoryDto } from './dto/update-cake-face-option.dto'
+import { CakeFaceCategoryEntity } from 'src/cake-face-category/cake-face-category.entity'
+import { CakeFaceEntity } from 'src/cake-face/cake-face.entity'
+import { CakeFaceOptionEntity } from './cake-face-option.entity'
+import { CreateCakeFaceOptionDto } from './dto/create-cake-face-option.dto'
+import { UpdateCakeFaceOptionDto } from './dto/update-cake-face-option.dto'
 
 @Injectable()
-export class CakeFaceCategoryService {
+export class CakeFaceOptionService {
   constructor(
     private readonly configService: ConfigService,
-    @InjectRepository(CategoryEntity)
-    private readonly categoryRepository: Repository<CategoryEntity>,
-    @InjectRepository(ArticleEntity)
-    private readonly articleRepository: Repository<ArticleEntity>,
-    @InjectRepository(ArticleContentEntity)
-    private readonly articleContentRepository: Repository<ArticleContentEntity>,
+    @InjectRepository(CakeFaceCategoryEntity)
+    private readonly categoryRepository: Repository<CakeFaceCategoryEntity>,
+    @InjectRepository(CakeFaceEntity)
+    private readonly cakeFaceRepository: Repository<CakeFaceEntity>,
+    @InjectRepository(CakeFaceOptionEntity)
+    private readonly optionRepository: Repository<CakeFaceOptionEntity>,
   ) {}
 
   async create(
-    createCategoryDto: CreateCakeFaceCategoryDto,
-    thumbnail: Express.Multer.File,
-  ): Promise<CategoryEntity | null> {
+    createOptionDto: CreateCakeFaceOptionDto,
+    creator: string,
+    image: Express.Multer.File,
+  ): Promise<CakeFaceOptionEntity | null> {
     try {
-      console.log('DTO_CREATE_CATEGORY:', createCategoryDto)
+      console.log('CREATE_OPTION_DTO:', createOptionDto)
+
+      let { cakeFaceId, ...createOptionData } = createOptionDto
+
+      let cakeFace = await this.categoryRepository.findOne({ where: { id: Number(cakeFaceId) } })
+      if (!cakeFace) return null
 
       let createTime = new Date()
-      let savedThumbnailName = `cate_thumb_${createTime.getTime()}_${generateRandomString(10)}.${
-        thumbnail.originalname.split('.').reverse()[0]
-      }`
-      let savedThumbnailPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'category', savedThumbnailName)
-      try {
-        const folderPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'category')
-        if (!fs.existsSync(folderPath)) {
-          fs.mkdirSync(folderPath, { recursive: true })
-        }
-        fs.writeFileSync(savedThumbnailPath, thumbnail.buffer)
-      } catch (error) {
-        console.log('Error when saving image: ', error)
-        return null
-      }
-      let newCategory = {
-        ...createCategoryDto,
+      let imagePath = await this.saveImage(createTime.getTime(), image)
+
+      let newOptionData = {
+        ...createOptionData,
         createTime: createTime,
-        thumbnail: savedThumbnailPath,
-        active: createCategoryDto.isActive === '1',
+        image: imagePath,
+        isActive: createOptionData.isActive === '1',
+        createDate: createTime,
+        createBy: creator,
+        updateDate: createTime,
+        updateBy: creator,
+        cakeFace,
       }
-      let category = this.categoryRepository.create(newCategory)
-      return await this.categoryRepository.save(category)
+
+      let newOption = this.optionRepository.create(newOptionData)
+      return await this.optionRepository.save(newOption)
     } catch (error) {
       console.log('ERROR_CREATE_CATEGORY:', error)
 
@@ -60,82 +60,77 @@ export class CakeFaceCategoryService {
     }
   }
 
-  async findAll(): Promise<CategoryEntity[] | null> {
+  async findAll(): Promise<CakeFaceOptionEntity[] | null> {
     try {
-      let categoryList = await this.categoryRepository.find({
+      let optionList = await this.optionRepository.find({
         order: {
-          createTime: 'ASC',
+          createDate: 'ASC',
         },
       })
-      let newCategoryList: CategoryEntity[] = []
-      categoryList.forEach((cate) => {
-        let newCategory: CategoryEntity = {
-          ...cate,
-          thumbnail: `${this.configService.get('API_HOST')}/${cate.thumbnail}`,
+      let newOptionList: CakeFaceOptionEntity[] = []
+      optionList.forEach((opt) => {
+        let newOption: CakeFaceOptionEntity = {
+          ...opt,
+          image: `${this.configService.get('API_HOST')}/${opt.image}`,
         }
-        newCategoryList.push(newCategory)
+        newOptionList.push(newOption)
       })
-      return newCategoryList
+      return newOptionList
     } catch (error) {
       return null
     }
   }
 
-  async findOne(id: string): Promise<CategoryEntity | undefined | null> {
+  async findOne(id: number): Promise<CakeFaceOptionEntity | undefined | null> {
     try {
-      return await this.categoryRepository.findOne({ where: { id } })
+      return await this.optionRepository.findOne({ where: { id } })
     } catch (error) {
       return null
     }
   }
 
   async update(
-    id: string,
-    updateCategoryDto: UpdateCakeFaceCategoryDto,
-    thumbnail: Express.Multer.File | undefined,
-  ): Promise<CategoryEntity | null> {
+    optionId: number,
+    updateOptionDto: UpdateCakeFaceOptionDto,
+    updater: string,
+    image?: Express.Multer.File | undefined,
+  ): Promise<CakeFaceOptionEntity | null> {
     try {
-      console.log('DTO_UPDATE_CATEGORY', updateCategoryDto)
-      console.log('thumbnail', thumbnail)
+      console.log('DTO_UPDATE_OPTION', UpdateCakeFaceOptionDto)
+      console.log('image', image)
 
-      let currentCategory = await this.categoryRepository.findOne({ where: { id } })
-      if (!currentCategory) {
+      let currentOption = await this.optionRepository.findOne({ where: { id: optionId } })
+      if (!currentOption) {
         return null
       }
-      let savedThumbnailPath = currentCategory.thumbnail
 
-      if (thumbnail) {
-        let updateTime = new Date()
-        let savedThumbnailName = `cate_thumb_${updateTime.getTime()}_${generateRandomString(10)}.${
-          thumbnail.originalname.split('.').reverse()[0]
-        }`
-        savedThumbnailPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'category', savedThumbnailName)
-        console.log('savedThumbnailPath', savedThumbnailPath)
-        try {
-          const folderPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'category')
-          if (!fs.existsSync(folderPath)) {
-            fs.mkdirSync(folderPath, { recursive: true })
-          }
-          fs.writeFileSync(savedThumbnailPath, thumbnail.buffer)
-        } catch (error) {
-          console.log('Error when saving image: ', error)
+      let updateTime = new Date()
+
+      let { id, ...oldData } = currentOption
+      console.log('Update cake face with id = ', id)
+
+      let newImagePath = oldData.image
+      if (image) {
+        newImagePath = await this.saveImage(updateTime.getTime(), image)
+        if (!newImagePath) {
           return null
         }
-        try {
-          await fs.promises.unlink(currentCategory.thumbnail)
-        } catch (error) {
-          console.log('ERROR DELETE OLD THUMBNAIL:', error)
-        }
       }
 
-      let updatedCategory = {
-        name: updateCategoryDto.name,
-        active: updateCategoryDto.isActive === '1',
-        thumbnail: savedThumbnailPath,
-        createTime: currentCategory.createTime,
+      let updatedOptionData = {
+        ...oldData,
+        ...updateOptionDto,
+        image: newImagePath,
+        updateDate: updateTime,
+        updateBy: updater,
+        isActive: updateOptionDto.isActive ? updateOptionDto.isActive === '1' : oldData.isActive,
       }
-      await this.categoryRepository.update(id, updatedCategory)
-      return this.categoryRepository.findOne({ where: { id } })
+
+      let updateRes = await this.optionRepository.update(optionId, updatedOptionData)
+      if (updateRes.affected > 0) {
+        await this.removeOldImage(oldData.image)
+      }
+      return this.optionRepository.findOne({ where: { id: optionId } })
     } catch (error) {
       console.log('ERROR:', error)
       return null
@@ -144,37 +139,35 @@ export class CakeFaceCategoryService {
 
   async remove(id: string): Promise<number> {
     try {
-      let existedCategory = await this.categoryRepository.findOne({
-        where: { id },
-      })
-      if (existedCategory) {
-        let articles = await this.articleRepository.find({
-          where: { category: { id: existedCategory.id } },
-          relations: ['category'], // If you want to include the category details in the result
-        })
-        if (Array.isArray(articles) && articles.length > 0) {
-          articles.forEach(async (article) => {
-            let articleContents = await this.articleContentRepository.find({
-              where: { article: { id: article.id } },
-              relations: ['article'], // If you want to include the category details in the result
-            })
-            articleContents.forEach(async (content) => {
-              await this.articleContentRepository.delete(content.id)
-            })
-            await this.articleRepository.delete(article.id)
-          })
-        }
-        let result = await this.categoryRepository.delete(id)
-        try {
-          await fs.promises.unlink(existedCategory.thumbnail)
-        } catch (error) {
-          console.log('ERROR DELETE OLD THUMBNAIL:', error)
-        }
-        return result.affected
-      } else return 0
+      console.log('User want to remove cake face option id =', id)
+
+      return 0
     } catch (error) {
       console.log(error)
       return -1
+    }
+  }
+
+  private async saveImage(time: string | number, imageFile: Express.Multer.File) {
+    let savedAvatarName = `cfo_${time}_${generateRandomString(10)}.${imageFile.originalname.split('.').reverse()[0]}`
+    let savedImagePath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face-option', savedAvatarName)
+    try {
+      const folderPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face-option')
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath, { recursive: true })
+      }
+      fs.writeFileSync(savedImagePath, imageFile.buffer)
+    } catch (error) {
+      console.log('Error when saving image: ', error)
+      return null
+    }
+  }
+
+  private async removeOldImage(path: string) {
+    try {
+      await fs.promises.unlink(path)
+    } catch (error) {
+      console.log('ERROR DELETE OLD IMAGE:', error)
     }
   }
 }

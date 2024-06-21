@@ -4,8 +4,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'ty
 
 @Entity('cake_face')
 export class CakeFaceEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
+  @PrimaryGeneratedColumn()
+  id: number
 
   @Column({ type: 'varchar', length: 50 })
   name: string
@@ -36,6 +36,12 @@ export class CakeFaceEntity {
 
   @Column()
   updateBy: string
+
+  @Column({ default: 0 })
+  viewAmount: number
+
+  @Column({ default: 0 })
+  downloadAmount: number
 
   @ManyToOne(() => CakeFaceCategoryEntity, (category) => category.cakeFaces)
   category: CakeFaceCategoryEntity
