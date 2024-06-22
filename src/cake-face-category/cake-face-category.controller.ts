@@ -12,6 +12,7 @@ import {
   UploadedFile,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common'
 import { CakeFaceCategoryService } from './cake-face-category.service'
 import { Response } from 'express'
@@ -80,12 +81,30 @@ export class CakeFaceCategoryController {
   }
 
   @Get()
-  async findAll(@Res() res: Response) {
-    let categories = await this.categoryService.findAll()
+  async getList(
+    @Query('limit') limit: number,
+    @Query('page') page: number,
+    @Query('name') name: string,
+    @Query('isActive') isActive: '0' | '1',
+    @Query('sortBy') sortBy: 'name' | 'createDate',
+    @Query('sort') sort: 'ASC' | 'DESC',
+    @Res() res: Response,
+  ) {
+    // Validate and set defaults
+    limit = isNaN(limit) || limit <= 0 ? 10 : limit
+    page = isNaN(page) || page <= 0 ? 1 : page
+    name = name || ''
+    sortBy = sortBy !== 'name' && sortBy !== 'createDate' ? 'name' : sortBy
+    sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
+
+    let categories = await this.categoryService.getList(limit, page, name, isActive, sortBy, sort)
     if (Array.isArray(categories)) {
       let response: RESPONSE_TYPE = {
         status: true,
-        params: categories,
+        params: {
+          total: categories.length,
+          data: categories,
+        },
       }
       res.status(HttpStatus.OK).json(response)
     } else {

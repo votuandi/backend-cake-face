@@ -9,6 +9,9 @@ export class CakeFaceCategoryEntity {
   @Column({ type: 'varchar', length: 50 })
   name: string
 
+  @Column({ type: 'text' })
+  detail: string
+
   @Column({ type: 'varchar', length: 500, default: '/public/image/cake-face-category/default.png' })
   thumbnail: string
 

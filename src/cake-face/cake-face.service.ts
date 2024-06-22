@@ -31,6 +31,8 @@ export class CakeFaceService {
   ): Promise<CakeFaceEntity | null> {
     try {
       console.log('CREATE_CAKE_FACE_DTO:', createCakeFaceDto)
+      console.log('thumbnail', thumbnail, typeof thumbnail)
+      console.log('configFile', configFile, typeof configFile)
 
       let { categoryId, ...createCakeFaceData } = createCakeFaceDto
 
@@ -40,6 +42,9 @@ export class CakeFaceService {
       let createTime = new Date()
       let thumbnailPath = await this.saveFile(createTime.getTime(), thumbnail)
       let configFilePath = await this.saveFile(createTime.getTime(), configFile)
+
+      console.log('thumbnailPath', thumbnailPath)
+      console.log('configFilePath', configFilePath)
 
       let newCakeFaceData = {
         ...createCakeFaceData,
@@ -63,13 +68,33 @@ export class CakeFaceService {
     }
   }
 
-  async findAll(): Promise<CakeFaceEntity[] | null> {
+  async getList(
+    limit: number = 10,
+    page: number = 1,
+    name: string = '',
+    categoryId?: number,
+    isActive?: '1' | '0',
+    sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount' = 'name',
+    sort: 'ASC' | 'DESC' = 'ASC',
+  ): Promise<CakeFaceEntity[] | null> {
     try {
-      let cakeFaceList = await this.cakeFaceRepository.find({
-        order: {
-          createDate: 'ASC',
-        },
-      })
+      let queryBuilder = this.cakeFaceRepository
+        .createQueryBuilder('cakeFace')
+        .where('cakeFace.name LIKE :name', { name: `%${name}%` })
+        .orderBy(`cakeFace.${sortBy}`, sort)
+        .skip((page - 1) * limit)
+        .take(limit)
+
+      if (categoryId) {
+        queryBuilder.andWhere('cakeFace.category.id = :categoryId', { categoryId })
+      }
+
+      if (isActive === '0' || isActive === '1') {
+        queryBuilder.andWhere('cakeFace.isActive = :isActive', { isActive: isActive === '1' })
+      }
+
+      let cakeFaceList = await queryBuilder.getMany()
+
       let newCakeFaceList: CakeFaceEntity[] = []
       cakeFaceList.forEach((cf) => {
         let newCakeFace: CakeFaceEntity = {
@@ -102,8 +127,6 @@ export class CakeFaceService {
   ): Promise<CakeFaceEntity | null> {
     try {
       console.log('DTO_UPDATE_CATEGORY', updateCakeFaceDto)
-      console.log('thumbnail', thumbnail)
-      console.log('configFile', configFile)
 
       let newCategory = null
       let { categoryId, ...updateCakeFaceData } = updateCakeFaceDto
@@ -125,6 +148,7 @@ export class CakeFaceService {
       let newThumbnailPath = oldData.thumbnail
       if (thumbnail) {
         newThumbnailPath = await this.saveFile(updateTime.getTime(), thumbnail)
+
         if (!newThumbnailPath) {
           return null
         }
@@ -172,13 +196,14 @@ export class CakeFaceService {
 
   private async saveFile(time: string | number, inpFile: Express.Multer.File) {
     let savedAvatarName = `cf_${time}_${generateRandomString(10)}.${inpFile.originalname.split('.').reverse()[0]}`
-    let savedThumbnailPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face', savedAvatarName)
+    let savedFilePath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face', savedAvatarName)
     try {
       const folderPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face')
       if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath, { recursive: true })
       }
-      fs.writeFileSync(savedThumbnailPath, inpFile.buffer)
+      fs.writeFileSync(savedFilePath, inpFile.buffer)
+      return savedFilePath
     } catch (error) {
       console.log('Error when saving file: ', error)
       return null

@@ -60,13 +60,33 @@ export class CakeFaceOptionService {
     }
   }
 
-  async findAll(): Promise<CakeFaceOptionEntity[] | null> {
+  async getList(
+    limit: number = 10,
+    page: number = 1,
+    name: string = '',
+    cakeFaceId?: number,
+    isActive?: '1' | '0',
+    sortBy: 'name' | 'createDate' = 'name',
+    sort: 'ASC' | 'DESC' = 'ASC',
+  ): Promise<CakeFaceOptionEntity[] | null> {
     try {
-      let optionList = await this.optionRepository.find({
-        order: {
-          createDate: 'ASC',
-        },
-      })
+      let queryBuilder = this.optionRepository
+        .createQueryBuilder('cakeFaceOption')
+        .where('cakeFaceOption.name LIKE :name', { name: `%${name}%` })
+        .orderBy(`cakeFaceOption.${sortBy}`, sort)
+        .skip((page - 1) * limit)
+        .take(limit)
+
+      if (cakeFaceId) {
+        queryBuilder.andWhere('cakeFaceOption.cakeFace.id = :cakeFaceId', { cakeFaceId })
+      }
+
+      if (isActive === '0' || isActive === '1') {
+        queryBuilder.andWhere('cakeFaceOption.isActive = :isActive', { isActive: isActive === '1' })
+      }
+
+      let optionList = await queryBuilder.getMany()
+
       let newOptionList: CakeFaceOptionEntity[] = []
       optionList.forEach((opt) => {
         let newOption: CakeFaceOptionEntity = {

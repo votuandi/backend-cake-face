@@ -24,6 +24,7 @@ export class CakeFaceCategoryService {
   ): Promise<CakeFaceCategoryEntity | null> {
     try {
       console.log('DTO_CREATE_CATEGORY:', createCategoryDto)
+      console.log('thumbnail', thumbnail, typeof thumbnail)
 
       let createTime = new Date()
       let thumbnailPath = await this.saveThumbnail(createTime.getTime(), thumbnail)
@@ -47,13 +48,28 @@ export class CakeFaceCategoryService {
     }
   }
 
-  async findAll(): Promise<CakeFaceCategoryEntity[] | null> {
+  async getList(
+    limit: number = 10,
+    page: number = 1,
+    name: string = '',
+    isActive?: '1' | '0',
+    sortBy: 'name' | 'createDate' = 'name',
+    sort: 'ASC' | 'DESC' = 'ASC',
+  ): Promise<CakeFaceCategoryEntity[] | null> {
     try {
-      let categoryList = await this.cakeFaceCategoryRepository.find({
-        order: {
-          createDate: 'ASC',
-        },
-      })
+      let queryBuilder = this.cakeFaceCategoryRepository
+        .createQueryBuilder('cakeFaceCategory')
+        .where('cakeFaceCategory.name LIKE :name', { name: `%${name}%` })
+        .orderBy(`cakeFaceCategory.${sortBy}`, sort)
+        .skip((page - 1) * limit)
+        .take(limit)
+
+      if (isActive === '0' || isActive === '1') {
+        queryBuilder.andWhere('cakeFaceCategory.isActive = :isActive', { isActive: isActive === '1' })
+      }
+
+      let categoryList = await queryBuilder.getMany()
+
       let newCategoryList: CakeFaceCategoryEntity[] = []
       categoryList.forEach((cate) => {
         let newCategory: CakeFaceCategoryEntity = {
@@ -64,6 +80,8 @@ export class CakeFaceCategoryService {
       })
       return newCategoryList
     } catch (error) {
+      console.log(error)
+
       return null
     }
   }
@@ -155,6 +173,7 @@ export class CakeFaceCategoryService {
 
   private async removeOldThumbnail(path: string) {
     try {
+      if (path.includes('default.png')) return
       await fs.promises.unlink(path)
     } catch (error) {
       console.log('ERROR DELETE OLD THUMBNAIL:', error)

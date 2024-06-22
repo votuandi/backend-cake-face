@@ -12,10 +12,12 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
+  Query,
+  UploadedFiles,
 } from '@nestjs/common'
 import { CakeFaceService } from './cake-face.service'
 import { Response } from 'express'
-import { FileInterceptor } from '@nestjs/platform-express'
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express'
 import { RESPONSE_TYPE } from 'src/types/commom'
 import { CreateCakeFaceDto } from './dto/create-cake-face.dto'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
@@ -31,63 +33,102 @@ export class CakeFaceController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Post()
-  @UseInterceptors(FileInterceptor('thumbnail'))
-  @UseInterceptors(FileInterceptor('configFile'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'configFile', maxCount: 1 },
+    ]),
+  )
   async create(
-    @UploadedFile() thumbnail: Express.Multer.File,
-    @UploadedFile() configFile: Express.Multer.File,
+    @UploadedFiles() files: { thumbnail?: Express.Multer.File[]; configFile?: Express.Multer.File[] },
     @Body() createCakeFaceDto: CreateCakeFaceDto,
     @Request() req,
     @Res() res: Response,
   ) {
-    let requester = req?.user?.userName
-    if (!requester) {
-      let response: RESPONSE_TYPE = {
-        status: false,
-        message: 'Permission deny',
-      }
-      res.status(HttpStatus.FORBIDDEN).json(response)
-    }
+    try {
+      console.log('CREATE CF')
 
-    if (!!thumbnail && !!configFile) {
-      let newCategory = await this.cakeFaceService.create(createCakeFaceDto, requester, thumbnail, configFile)
-      if (newCategory === null) {
+      let thumbnail = files.thumbnail[0]
+      let configFile = files.configFile[0]
+
+      let requester = req?.user?.userName
+      if (!requester) {
         let response: RESPONSE_TYPE = {
           status: false,
-          message: 'Internal Server Error',
+          message: 'Permission deny',
         }
-        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
-      } else if (newCategory === undefined) {
-        let response: RESPONSE_TYPE = {
-          status: false,
-          message: 'Create Cake face failed',
+        res.status(HttpStatus.FORBIDDEN).json(response)
+      }
+
+      if (!!thumbnail && !!configFile) {
+        let newCakeFace = await this.cakeFaceService.create(createCakeFaceDto, requester, thumbnail, configFile)
+        if (newCakeFace === null) {
+          let response: RESPONSE_TYPE = {
+            status: false,
+            message: 'Internal Server Error',
+          }
+          res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+        } else if (newCakeFace === undefined) {
+          let response: RESPONSE_TYPE = {
+            status: false,
+            message: 'Create Cake face failed',
+          }
+          res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+        } else {
+          let response: RESPONSE_TYPE = {
+            status: true,
+            message: 'Create Cake face successfully',
+            params: newCakeFace,
+          }
+          res.status(HttpStatus.CREATED).json(response)
         }
-        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
       } else {
         let response: RESPONSE_TYPE = {
-          status: true,
-          message: 'Create Cake face successfully',
-          params: newCategory,
+          status: false,
+          message: 'Image not found',
         }
-        res.status(HttpStatus.CREATED).json(response)
+        res.status(HttpStatus.NOT_FOUND).json(response)
       }
-    } else {
+    } catch (error) {
+      console.log(error)
       let response: RESPONSE_TYPE = {
         status: false,
-        message: 'Image not found',
+        message: 'Bad Request',
       }
-      res.status(HttpStatus.NOT_FOUND).json(response)
+      res.status(HttpStatus.BAD_REQUEST).json(response)
     }
   }
 
   @Get()
-  async findAll(@Res() res: Response) {
+  async getList(
+    @Query('limit') limit: number,
+    @Query('page') page: number,
+    @Query('name') name: string,
+    @Query('categoryId') categoryId: number,
+    @Query('isActive') isActive: '0' | '1',
+    @Query('sortBy') sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount',
+    @Query('sort') sort: 'ASC' | 'DESC',
+    @Res() res: Response,
+  ) {
     try {
-      let categories = await this.cakeFaceService.findAll()
-      if (Array.isArray(categories)) {
+      // Validate and set defaults
+      limit = isNaN(limit) || limit <= 0 ? 10 : limit
+      page = isNaN(page) || page <= 0 ? 1 : page
+      name = name || ''
+      sortBy =
+        sortBy !== 'name' && sortBy !== 'createDate' && sortBy !== 'viewAmount' && sortBy !== 'downloadAmount'
+          ? 'name'
+          : sortBy
+      sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
+
+      let cakeFaceList = await this.cakeFaceService.getList(limit, page, name, categoryId, isActive, sortBy, sort)
+      if (Array.isArray(cakeFaceList)) {
         let response: RESPONSE_TYPE = {
           status: true,
-          params: categories,
+          params: {
+            total: cakeFaceList.length,
+            data: cakeFaceList,
+          },
         }
         res.status(HttpStatus.OK).json(response)
       } else {

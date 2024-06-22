@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
+  Query,
 } from '@nestjs/common'
 import { CakeFaceOptionService } from './cake-face-option.service'
 import { Response } from 'express'
@@ -79,20 +80,45 @@ export class CakeFaceOptionController {
   }
 
   @Get()
-  async findAll(@Res() res: Response) {
-    let categories = await this.categoryService.findAll()
-    if (Array.isArray(categories)) {
-      let response: RESPONSE_TYPE = {
-        status: true,
-        params: categories,
+  async getAll(
+    @Query('limit') limit: number,
+    @Query('page') page: number,
+    @Query('name') name: string,
+    @Query('cakeFaceId') cakeFaceId: number,
+    @Query('isActive') isActive: '0' | '1',
+    @Query('sortBy') sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount',
+    @Query('sort') sort: 'ASC' | 'DESC',
+    @Res() res: Response,
+  ) {
+    try {
+      // Validate and set defaults
+      limit = isNaN(limit) || limit <= 0 ? 10 : limit
+      page = isNaN(page) || page <= 0 ? 1 : page
+      name = name || ''
+      sortBy = sortBy !== 'name' && sortBy !== 'createDate' ? 'name' : sortBy
+      sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
+
+      let categories = await this.categoryService.getList(limit, page, name, cakeFaceId, isActive, sortBy, sort)
+      if (Array.isArray(categories)) {
+        let response: RESPONSE_TYPE = {
+          status: true,
+          params: categories,
+        }
+        res.status(HttpStatus.OK).json(response)
+      } else {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Internal Server Error',
+        }
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
       }
-      res.status(HttpStatus.OK).json(response)
-    } else {
+    } catch (error) {
+      console.log(error)
       let response: RESPONSE_TYPE = {
         status: false,
-        message: 'Internal Server Error',
+        message: 'Bad Request',
       }
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+      res.status(HttpStatus.BAD_REQUEST).json(response)
     }
   }
 
