@@ -8,6 +8,7 @@ import * as fs from 'fs'
 import { CreateCakeFaceCategoryDto } from './dto/create-cake-face-category.dto'
 import { UpdateCakeFaceCategoryDto } from './dto/update-cake-face-category.dto'
 import { CakeFaceCategoryEntity } from './cake-face-category.entity'
+import { CATEGORY_LIST_RES } from 'src/types/commom'
 
 @Injectable()
 export class CakeFaceCategoryService {
@@ -55,12 +56,13 @@ export class CakeFaceCategoryService {
     isActive?: '1' | '0',
     sortBy: 'name' | 'createDate' = 'name',
     sort: 'ASC' | 'DESC' = 'ASC',
-  ): Promise<CakeFaceCategoryEntity[] | null> {
+  ): Promise<CATEGORY_LIST_RES | null> {
     try {
       let queryBuilder = this.cakeFaceCategoryRepository
         .createQueryBuilder('cakeFaceCategory')
         .where('cakeFaceCategory.name LIKE :name', { name: `%${name}%` })
-        .orderBy(`cakeFaceCategory.${sortBy}`, sort)
+        .orderBy(`cakeFaceCategory.isActive`, 'DESC')
+        .addOrderBy(`cakeFaceCategory.${sortBy}`, sort)
         .skip((page - 1) * limit)
         .take(limit)
 
@@ -71,6 +73,7 @@ export class CakeFaceCategoryService {
       let categoryList = await queryBuilder.getMany()
 
       let newCategoryList: CakeFaceCategoryEntity[] = []
+
       categoryList.forEach((cate) => {
         let newCategory: CakeFaceCategoryEntity = {
           ...cate,
@@ -78,7 +81,13 @@ export class CakeFaceCategoryService {
         }
         newCategoryList.push(newCategory)
       })
-      return newCategoryList
+      const totalActive = await this.cakeFaceCategoryRepository.count({ where: { isActive: true } })
+      const total = await this.cakeFaceCategoryRepository.count()
+      return {
+        data: newCategoryList,
+        total,
+        totalActive,
+      }
     } catch (error) {
       console.log(error)
 
@@ -88,7 +97,13 @@ export class CakeFaceCategoryService {
 
   async findOne(id: number): Promise<CakeFaceCategoryEntity | undefined | null> {
     try {
-      return await this.cakeFaceCategoryRepository.findOne({ where: { id } })
+      let category = await this.cakeFaceCategoryRepository.findOne({ where: { id } })
+      if (!!category) {
+        return {
+          ...category,
+          thumbnail: `${this.configService.get('API_HOST')}/${category.thumbnail}`,
+        }
+      } else return undefined
     } catch (error) {
       return null
     }
@@ -101,8 +116,8 @@ export class CakeFaceCategoryService {
     thumbnail: Express.Multer.File | undefined,
   ): Promise<CakeFaceCategoryEntity | null> {
     try {
-      console.log('DTO_UPDATE_CATEGORY', updateCategoryDto)
-      console.log('thumbnail', thumbnail)
+      // console.log('DTO_UPDATE_CATEGORY', updateCategoryDto)
+      // console.log('thumbnail', thumbnail)
 
       let currentCategory = await this.cakeFaceCategoryRepository.findOne({ where: { id: categoryId } })
       if (!currentCategory) {
@@ -158,12 +173,15 @@ export class CakeFaceCategoryService {
         thumbnailFile.originalname.split('.').reverse()[0]
       }`
       let savedThumbnailPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face-category', savedAvatarName)
+      console.log('savedThumbnailPath', savedThumbnailPath)
+
       try {
         const folderPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face-category')
         if (!fs.existsSync(folderPath)) {
           fs.mkdirSync(folderPath, { recursive: true })
         }
         fs.writeFileSync(savedThumbnailPath, thumbnailFile.buffer)
+        return savedThumbnailPath
       } catch (error) {
         console.log('Error when saving image: ', error)
         return null

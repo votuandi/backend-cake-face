@@ -17,7 +17,7 @@ import {
 import { CakeFaceOptionService } from './cake-face-option.service'
 import { Response } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { RESPONSE_TYPE } from 'src/types/commom'
+import { CAKE_FACE_OPTION_LIST_RES, RESPONSE_TYPE } from 'src/types/commom'
 import { CreateCakeFaceOptionDto } from './dto/create-cake-face-option.dto'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
@@ -86,23 +86,31 @@ export class CakeFaceOptionController {
     @Query('name') name: string,
     @Query('cakeFaceId') cakeFaceId: number,
     @Query('isActive') isActive: '0' | '1',
-    @Query('sortBy') sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount',
+    @Query('sortBy') sortBy: 'name' | 'createDate',
     @Query('sort') sort: 'ASC' | 'DESC',
     @Res() res: Response,
   ) {
     try {
       // Validate and set defaults
-      limit = isNaN(limit) || limit <= 0 ? 10 : limit
+      limit = isNaN(limit) || limit <= 0 ? 99999 : limit
       page = isNaN(page) || page <= 0 ? 1 : page
       name = name || ''
       sortBy = sortBy !== 'name' && sortBy !== 'createDate' ? 'name' : sortBy
       sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
 
-      let categories = await this.categoryService.getList(limit, page, name, cakeFaceId, isActive, sortBy, sort)
-      if (Array.isArray(categories)) {
+      let optionsRes: CAKE_FACE_OPTION_LIST_RES = await this.categoryService.getList(
+        limit,
+        page,
+        name,
+        cakeFaceId,
+        isActive,
+        sortBy,
+        sort,
+      )
+      if (Array.isArray(optionsRes.data)) {
         let response: RESPONSE_TYPE = {
           status: true,
-          params: categories,
+          params: { ...optionsRes, limit: limit },
         }
         res.status(HttpStatus.OK).json(response)
       } else {

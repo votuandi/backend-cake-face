@@ -10,6 +10,7 @@ import { CakeFaceEntity } from './cake-face.entity'
 import { CakeFaceOptionEntity } from 'src/cake-face-option/cake-face-option.entity'
 import { CreateCakeFaceDto } from './dto/create-cake-face.dto'
 import { UpdateCakeFaceDto } from './dto/update-cake-face.dto'
+import { CAKE_FACE_LIST_RES } from 'src/types/commom'
 
 @Injectable()
 export class CakeFaceService {
@@ -76,10 +77,11 @@ export class CakeFaceService {
     isActive?: '1' | '0',
     sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount' = 'name',
     sort: 'ASC' | 'DESC' = 'ASC',
-  ): Promise<CakeFaceEntity[] | null> {
+  ): Promise<CAKE_FACE_LIST_RES | null> {
     try {
       let queryBuilder = this.cakeFaceRepository
         .createQueryBuilder('cakeFace')
+        .leftJoinAndSelect('cakeFace.category', 'category')
         .where('cakeFace.name LIKE :name', { name: `%${name}%` })
         .orderBy(`cakeFace.${sortBy}`, sort)
         .skip((page - 1) * limit)
@@ -94,6 +96,7 @@ export class CakeFaceService {
       }
 
       let cakeFaceList = await queryBuilder.getMany()
+      console.log(cakeFaceList)
 
       let newCakeFaceList: CakeFaceEntity[] = []
       cakeFaceList.forEach((cf) => {
@@ -102,9 +105,16 @@ export class CakeFaceService {
           thumbnail: `${this.configService.get('API_HOST')}/${cf.thumbnail}`,
           configFilePath: `${this.configService.get('API_HOST')}/${cf.configFilePath}`,
         }
+
         newCakeFaceList.push(newCakeFace)
       })
-      return newCakeFaceList
+      const totalActive = await this.cakeFaceRepository.count({ where: { isActive: true } })
+      const total = await this.cakeFaceRepository.count()
+      return {
+        data: newCakeFaceList,
+        total,
+        totalActive,
+      }
     } catch (error) {
       return null
     }
@@ -112,7 +122,14 @@ export class CakeFaceService {
 
   async findOne(id: number): Promise<CakeFaceEntity | undefined | null> {
     try {
-      return await this.cakeFaceRepository.findOne({ where: { id } })
+      let cakeFaceData = await this.cakeFaceRepository.findOne({ where: { id }, relations: ['category'] })
+      if (!!cakeFaceData) {
+        return {
+          ...cakeFaceData,
+          thumbnail: `${this.configService.get('API_HOST')}/${cakeFaceData.thumbnail}`,
+          configFilePath: `${this.configService.get('API_HOST')}/${cakeFaceData.configFilePath}`,
+        }
+      } else return undefined
     } catch (error) {
       return null
     }
@@ -122,8 +139,8 @@ export class CakeFaceService {
     cakeFaceId: number,
     updateCakeFaceDto: UpdateCakeFaceDto,
     updater: string,
-    thumbnail: Express.Multer.File | undefined,
-    configFile: Express.Multer.File | undefined,
+    thumbnail?: Express.Multer.File | undefined,
+    configFile?: Express.Multer.File | undefined,
   ): Promise<CakeFaceEntity | null> {
     try {
       console.log('DTO_UPDATE_CATEGORY', updateCakeFaceDto)
@@ -173,11 +190,18 @@ export class CakeFaceService {
         category: newCategory,
       }
       let updateRes = await this.cakeFaceRepository.update(cakeFaceId, updatedCakeFace)
-      if (updateRes.affected > 0) {
+      if (updateRes.affected > 0 && !!configFile && !!thumbnail) {
         await this.removeOldFile(oldData.thumbnail)
         await this.removeOldFile(oldData.configFilePath)
       }
-      return this.cakeFaceRepository.findOne({ where: { id: cakeFaceId } })
+      let cakeFaceData = await this.cakeFaceRepository.findOne({ where: { id: cakeFaceId } })
+      if (!!cakeFaceData) {
+        return {
+          ...cakeFaceData,
+          thumbnail: `${this.configService.get('API_HOST')}/${cakeFaceData.thumbnail}`,
+          configFilePath: `${this.configService.get('API_HOST')}/${cakeFaceData.configFilePath}`,
+        }
+      } else return undefined
     } catch (error) {
       console.log('ERROR:', error)
       return null

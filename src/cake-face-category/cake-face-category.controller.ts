@@ -17,7 +17,7 @@ import {
 import { CakeFaceCategoryService } from './cake-face-category.service'
 import { Response } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { RESPONSE_TYPE } from 'src/types/commom'
+import { CATEGORY_LIST_RES, RESPONSE_TYPE } from 'src/types/commom'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { Roles } from 'src/auth/roles.decorator'
@@ -91,20 +91,24 @@ export class CakeFaceCategoryController {
     @Res() res: Response,
   ) {
     // Validate and set defaults
-    limit = isNaN(limit) || limit <= 0 ? 10 : limit
+    limit = isNaN(limit) || limit <= 0 ? 99999 : limit
     page = isNaN(page) || page <= 0 ? 1 : page
     name = name || ''
     sortBy = sortBy !== 'name' && sortBy !== 'createDate' ? 'name' : sortBy
     sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
 
-    let categories = await this.categoryService.getList(limit, page, name, isActive, sortBy, sort)
-    if (Array.isArray(categories)) {
+    let categoriesList: CATEGORY_LIST_RES = await this.categoryService.getList(
+      limit,
+      page,
+      name,
+      isActive,
+      sortBy,
+      sort,
+    )
+    if (Array.isArray(categoriesList.data)) {
       let response: RESPONSE_TYPE = {
         status: true,
-        params: {
-          total: categories.length,
-          data: categories,
-        },
+        params: { ...categoriesList, limit: limit },
       }
       res.status(HttpStatus.OK).json(response)
     } else {

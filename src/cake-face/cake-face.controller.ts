@@ -10,15 +10,14 @@ import {
   Res,
   HttpStatus,
   UseInterceptors,
-  UploadedFile,
   UseGuards,
   Query,
   UploadedFiles,
 } from '@nestjs/common'
 import { CakeFaceService } from './cake-face.service'
 import { Response } from 'express'
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express'
-import { RESPONSE_TYPE } from 'src/types/commom'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
+import { CAKE_FACE_LIST_RES, RESPONSE_TYPE } from 'src/types/commom'
 import { CreateCakeFaceDto } from './dto/create-cake-face.dto'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
@@ -112,7 +111,7 @@ export class CakeFaceController {
   ) {
     try {
       // Validate and set defaults
-      limit = isNaN(limit) || limit <= 0 ? 10 : limit
+      limit = isNaN(limit) || limit <= 0 ? 99999 : limit
       page = isNaN(page) || page <= 0 ? 1 : page
       name = name || ''
       sortBy =
@@ -121,14 +120,19 @@ export class CakeFaceController {
           : sortBy
       sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
 
-      let cakeFaceList = await this.cakeFaceService.getList(limit, page, name, categoryId, isActive, sortBy, sort)
-      if (Array.isArray(cakeFaceList)) {
+      let cakeFaceListRes: CAKE_FACE_LIST_RES = await this.cakeFaceService.getList(
+        limit,
+        page,
+        name,
+        categoryId,
+        isActive,
+        sortBy,
+        sort,
+      )
+      if (Array.isArray(cakeFaceListRes.data)) {
         let response: RESPONSE_TYPE = {
           status: true,
-          params: {
-            total: cakeFaceList.length,
-            data: cakeFaceList,
-          },
+          params: { ...cakeFaceListRes, limit: limit },
         }
         res.status(HttpStatus.OK).json(response)
       } else {
@@ -184,17 +188,27 @@ export class CakeFaceController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Put(':id')
-  @UseInterceptors(FileInterceptor('thumbnail'))
-  @UseInterceptors(FileInterceptor('configFile'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'configFile', maxCount: 1 },
+    ]),
+  )
   async update(
     @Param('id') id: string,
-    @UploadedFile() thumbnail: Express.Multer.File,
-    @UploadedFile() configFile: Express.Multer.File,
+    @UploadedFiles() files: { thumbnail?: Express.Multer.File[]; configFile?: Express.Multer.File[] },
     @Body() updateCakeFaceDto: UpdateCakeFaceDto,
     @Request() req,
     @Res() res: Response,
   ) {
     try {
+      let thumbnail = undefined
+      let configFile = undefined
+      if (!!files) {
+        thumbnail = Array.isArray(files.thumbnail) ? files.thumbnail[0] : undefined
+        configFile = Array.isArray(files.configFile) ? files.configFile[0] : undefined
+      }
+
       let requester = req?.user?.userName
       if (!requester) {
         let response: RESPONSE_TYPE = {
@@ -203,6 +217,8 @@ export class CakeFaceController {
         }
         res.status(HttpStatus.FORBIDDEN).json(response)
       }
+
+      console.log('requester', requester)
 
       let cakeFace = await this.cakeFaceService.update(Number(id), updateCakeFaceDto, requester, thumbnail, configFile)
       if (cakeFace === null) {

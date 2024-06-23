@@ -10,6 +10,7 @@ import { CakeFaceEntity } from 'src/cake-face/cake-face.entity'
 import { CakeFaceOptionEntity } from './cake-face-option.entity'
 import { CreateCakeFaceOptionDto } from './dto/create-cake-face-option.dto'
 import { UpdateCakeFaceOptionDto } from './dto/update-cake-face-option.dto'
+import { CAKE_FACE_OPTION_LIST_RES } from 'src/types/commom'
 
 @Injectable()
 export class CakeFaceOptionService {
@@ -68,12 +69,13 @@ export class CakeFaceOptionService {
     isActive?: '1' | '0',
     sortBy: 'name' | 'createDate' = 'name',
     sort: 'ASC' | 'DESC' = 'ASC',
-  ): Promise<CakeFaceOptionEntity[] | null> {
+  ): Promise<CAKE_FACE_OPTION_LIST_RES | null> {
     try {
       let queryBuilder = this.optionRepository
         .createQueryBuilder('cakeFaceOption')
         .where('cakeFaceOption.name LIKE :name', { name: `%${name}%` })
-        .orderBy(`cakeFaceOption.${sortBy}`, sort)
+        .orderBy(`cakeFaceOption.isActive`, 'DESC')
+        .addOrderBy(`cakeFaceOption.${sortBy}`, sort)
         .skip((page - 1) * limit)
         .take(limit)
 
@@ -95,7 +97,14 @@ export class CakeFaceOptionService {
         }
         newOptionList.push(newOption)
       })
-      return newOptionList
+
+      const totalActive = await this.optionRepository.count({ where: { isActive: true } })
+      const total = await this.optionRepository.count()
+      return {
+        data: newOptionList,
+        total,
+        totalActive,
+      }
     } catch (error) {
       return null
     }
@@ -103,7 +112,13 @@ export class CakeFaceOptionService {
 
   async findOne(id: number): Promise<CakeFaceOptionEntity | undefined | null> {
     try {
-      return await this.optionRepository.findOne({ where: { id } })
+      let optionData = await this.optionRepository.findOne({ where: { id } })
+      if (!!optionData) {
+        return {
+          ...optionData,
+          image: `${this.configService.get('API_HOST')}/${optionData.image}`,
+        }
+      } else return undefined
     } catch (error) {
       return null
     }
@@ -177,6 +192,7 @@ export class CakeFaceOptionService {
         fs.mkdirSync(folderPath, { recursive: true })
       }
       fs.writeFileSync(savedImagePath, imageFile.buffer)
+      return savedImagePath
     } catch (error) {
       console.log('Error when saving image: ', error)
       return null
