@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt'
 import { CakeFaceCategoryModule } from './cake-face-category/cake-face-category.module'
 import { CakeFaceModule } from './cake-face/cake-face.module'
 import { CakeFaceOptionModule } from './cake-face-option/cake-face-option.module'
+import { BannerModule } from './banner/banner.module'
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { CakeFaceOptionModule } from './cake-face-option/cake-face-option.module
     CakeFaceCategoryModule,
     CakeFaceModule,
     CakeFaceOptionModule,
+    BannerModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),

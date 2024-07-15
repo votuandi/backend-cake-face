@@ -28,12 +28,12 @@ export class CakeFaceService {
     createCakeFaceDto: CreateCakeFaceDto,
     creator: string,
     thumbnail: Express.Multer.File,
-    configFile: Express.Multer.File,
+    configFile: Express.Multer.File[],
   ): Promise<CakeFaceEntity | null> {
     try {
-      console.log('CREATE_CAKE_FACE_DTO:', createCakeFaceDto)
-      console.log('thumbnail', thumbnail, typeof thumbnail)
-      console.log('configFile', configFile, typeof configFile)
+      // console.log('CREATE_CAKE_FACE_DTO:', createCakeFaceDto)
+      // console.log('thumbnail', thumbnail, typeof thumbnail)
+      // console.log('configFile', configFile, typeof configFile)
 
       let { categoryId, ...createCakeFaceData } = createCakeFaceDto
 
@@ -42,10 +42,12 @@ export class CakeFaceService {
 
       let createTime = new Date()
       let thumbnailPath = await this.saveFile(createTime.getTime(), thumbnail)
-      let configFilePath = await this.saveFile(createTime.getTime(), configFile)
-
-      console.log('thumbnailPath', thumbnailPath)
-      console.log('configFilePath', configFilePath)
+      let configFilePaths: string[] = []
+      for (let cf of configFile) {
+        let path = await this.saveFile(createTime.getTime(), cf)
+        configFilePaths.push(path)
+      }
+      let configFilePath = configFilePaths.join(',')
 
       let newCakeFaceData = {
         ...createCakeFaceData,
@@ -73,9 +75,10 @@ export class CakeFaceService {
     limit: number = 10,
     page: number = 1,
     name: string = '',
-    categoryId?: number,
+    categoryId?: number | string,
     isActive?: '1' | '0',
-    sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount' = 'name',
+    isTrendy?: '1' | '0',
+    sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount' | 'isTrendy' = 'name',
     sort: 'ASC' | 'DESC' = 'ASC',
   ): Promise<CAKE_FACE_LIST_RES | null> {
     try {
@@ -88,22 +91,28 @@ export class CakeFaceService {
         .take(limit)
 
       if (categoryId) {
-        queryBuilder.andWhere('cakeFace.category.id = :categoryId', { categoryId })
+        queryBuilder.andWhere('cakeFace.category.id = :categoryId', { categoryId: Number(categoryId) })
       }
 
       if (isActive === '0' || isActive === '1') {
         queryBuilder.andWhere('cakeFace.isActive = :isActive', { isActive: isActive === '1' })
       }
 
+      if (isTrendy === '0' || isTrendy === '1') {
+        queryBuilder.andWhere('cakeFace.isTrendy = :isTrendy', { isTrendy: isTrendy === '1' })
+      }
+
       let cakeFaceList = await queryBuilder.getMany()
-      console.log(cakeFaceList)
 
       let newCakeFaceList: CakeFaceEntity[] = []
       cakeFaceList.forEach((cf) => {
         let newCakeFace: CakeFaceEntity = {
           ...cf,
           thumbnail: `${this.configService.get('API_HOST')}/${cf.thumbnail}`,
-          configFilePath: `${this.configService.get('API_HOST')}/${cf.configFilePath}`,
+          configFilePath: cf.configFilePath
+            .split(',')
+            .map((x) => `${this.configService.get('API_HOST')}/${x}`)
+            .join(','),
         }
 
         newCakeFaceList.push(newCakeFace)
@@ -127,7 +136,14 @@ export class CakeFaceService {
         return {
           ...cakeFaceData,
           thumbnail: `${this.configService.get('API_HOST')}/${cakeFaceData.thumbnail}`,
-          configFilePath: `${this.configService.get('API_HOST')}/${cakeFaceData.configFilePath}`,
+          // configFilePath: `${this.configService.get('API_HOST')}/${cakeFaceData.configFilePath}`,
+          configFilePath:
+            cakeFaceData.configFilePath.length > 0
+              ? cakeFaceData.configFilePath
+                  .split(',')
+                  .map((x) => `${this.configService.get('API_HOST')}/${x.replaceAll(/\\/g, '/')}`)
+                  .join(',')
+              : '',
         }
       } else return undefined
     } catch (error) {
@@ -199,7 +215,10 @@ export class CakeFaceService {
         return {
           ...cakeFaceData,
           thumbnail: `${this.configService.get('API_HOST')}/${cakeFaceData.thumbnail}`,
-          configFilePath: `${this.configService.get('API_HOST')}/${cakeFaceData.configFilePath}`,
+          configFilePath: cakeFaceData.configFilePath
+            .split(',')
+            .map((x) => `${this.configService.get('API_HOST')}/${x.replaceAll(/\\/g, '/')}`)
+            .join(','),
         }
       } else return undefined
     } catch (error) {
@@ -211,6 +230,31 @@ export class CakeFaceService {
   async remove(id: string): Promise<number> {
     try {
       console.log('User want to remove category id =', id)
+      const result = await this.cakeFaceRepository.delete(id)
+      return result.affected
+    } catch (error) {
+      console.log(error)
+      return -1
+    }
+  }
+
+  async removeConfigFile(id: string, index: string, updater: string): Promise<number> {
+    try {
+      let currentCakeFace = await this.cakeFaceRepository.findOne({ where: { id: Number(id) } })
+      if (!currentCakeFace) return 0
+      let pathList = currentCakeFace.configFilePath.split(',')
+      if (pathList.length < Number(index)) return 0
+      let removedItem = pathList[index]
+      pathList.splice(Number(index), 1)
+      let updateRes = await this.cakeFaceRepository.update(id, {
+        updateBy: updater,
+        updateDate: new Date(),
+        configFilePath: pathList.join(','),
+      })
+      if (updateRes.affected > 0) {
+        await this.removeOldFile(removedItem)
+        return 1
+      }
       return 0
     } catch (error) {
       console.log(error)
@@ -218,8 +262,32 @@ export class CakeFaceService {
     }
   }
 
+  async addConfigFiles(id: string, newFiles: Express.Multer.File[], updater: string): Promise<number> {
+    try {
+      let createTime = new Date()
+      let currentCakeFace = await this.cakeFaceRepository.findOne({ where: { id: Number(id) } })
+      if (!currentCakeFace) return 0
+      let pathList = currentCakeFace.configFilePath.split(',')
+      for (let cf of newFiles) {
+        let path = await this.saveFile(createTime.getTime(), cf)
+        pathList.push(path)
+      }
+      let updateRes = await this.cakeFaceRepository.update(id, {
+        updateBy: updater,
+        updateDate: new Date(),
+        configFilePath: pathList.join(','),
+      })
+      return updateRes.affected
+    } catch (error) {
+      console.log(error)
+      return -1
+    }
+  }
+
   private async saveFile(time: string | number, inpFile: Express.Multer.File) {
-    let savedAvatarName = `cf_${time}_${generateRandomString(10)}.${inpFile.originalname.split('.').reverse()[0]}`
+    let savedAvatarName = `cf_${inpFile.originalname.split('.')[0]}_${time}_${generateRandomString(10)}.${
+      inpFile.originalname.split('.').reverse()[0]
+    }`
     let savedFilePath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face', savedAvatarName)
     try {
       const folderPath = join(this.configService.get('MEDIA_UPLOAD_PATH'), 'cake-face')

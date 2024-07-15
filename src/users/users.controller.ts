@@ -11,6 +11,7 @@ import {
   Res,
   HttpStatus,
   Request,
+  Query,
 } from '@nestjs/common'
 import { UserService } from './users.service'
 import { CreateUserDto } from './dto/create-user.dto'
@@ -21,7 +22,7 @@ import { Roles } from '../auth/roles.decorator'
 import { Role } from '../auth/roles.enum'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Response } from 'express'
-import { RESPONSE_TYPE } from 'src/types/commom'
+import { RESPONSE_TYPE, USER_LIST_RES } from 'src/types/commom'
 
 @Controller('user')
 export class UserController {
@@ -90,8 +91,35 @@ export class UserController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Get()
-  async getUserList() {
-    return this.userService.getUserList()
+  async getUserList(
+    @Query('limit') limit: number,
+    @Query('page') page: number,
+    @Query('keyword') keyword: string,
+    @Query('isActive') isActive: '0' | '1',
+    @Query('role') role: 'admin' | 'client' | 'user',
+    @Res() res: Response,
+  ) {
+    try {
+      limit = isNaN(limit) || limit <= 0 ? 99999 : limit
+      page = isNaN(page) || page <= 0 ? 1 : page
+      keyword = keyword || ''
+
+      let records: USER_LIST_RES = await this.userService.getUserList(limit, page, keyword, isActive, role)
+      if (Array.isArray(records?.data)) {
+        let response: RESPONSE_TYPE = {
+          status: true,
+          params: { ...records, limit: limit },
+        }
+        res.status(HttpStatus.OK).json(response)
+      }
+    } catch (error) {
+      console.log(error)
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'Internal Server Error',
+      }
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+    }
   }
 
   @UseGuards(JwtAuthGuard)

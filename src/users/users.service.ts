@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Brackets, Repository } from 'typeorm'
 import { UserEntity } from './entities/user.entity'
 import { UserInformationEntity } from './entities/user-information.entity'
 import { CreateUserDto } from './dto/create-user.dto'
@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config'
 import * as bcrypt from 'bcryptjs'
 import * as fs from 'fs'
 import { join } from 'path'
+import { USER_LIST_RES } from 'src/types/commom'
 
 @Injectable()
 export class UserService {
@@ -90,8 +91,59 @@ export class UserService {
     }
   }
 
-  async getUserList(): Promise<UserInformationEntity[]> {
-    return this.userInformationRepository.find()
+  async getUserList(
+    limit: number = 10,
+    page: number = 1,
+    keyword: string = '',
+    isActive?: '1' | '0',
+    role?: 'admin' | 'client' | 'user',
+  ): Promise<USER_LIST_RES | null> {
+    // return this.userInformationRepository.find()
+    try {
+      let queryBuilder = this.userInformationRepository.createQueryBuilder('userInformation')
+
+      if (role === 'admin' || role === 'client' || role === 'user') {
+        queryBuilder.where('userInformation.role = :role', { role })
+      }
+
+      queryBuilder
+        .andWhere(
+          new Brackets((qb) => {
+            if (keyword) {
+              qb.where('userInformation.userName LIKE :keyword', { keyword: `%${keyword}%` })
+                .orWhere('userInformation.name LIKE :keyword', { keyword: `%${keyword}%` })
+                .orWhere('userInformation.phoneNumber LIKE :keyword', { keyword: `%${keyword}%` })
+            }
+          }),
+        )
+        .orderBy('userInformation.userName', 'ASC')
+        .skip((page - 1) * limit)
+        .take(limit)
+
+      if (isActive === '0' || isActive === '1') {
+        queryBuilder.andWhere('userInformation.isActive = :isActive', { isActive: isActive === '1' })
+      }
+
+      let userInformationList = await queryBuilder.getMany()
+      let newUserInformationList: UserInformationEntity[] = []
+      userInformationList.forEach((u) => {
+        let newUserInformation: UserInformationEntity = {
+          ...u,
+          avatar: `${this.configService.get('API_HOST')}/${u.avatar.replaceAll(/\\/g, '/')}`,
+        }
+        newUserInformationList.push(newUserInformation)
+      })
+      const totalActive = await this.userInformationRepository.count({ where: { isActive: true } })
+      const total = await this.userInformationRepository.count()
+      return {
+        data: newUserInformationList,
+        total,
+        totalActive,
+      }
+    } catch (error) {
+      console.log(error)
+      return null
+    }
   }
 
   private async hashPassword(password: string): Promise<string> {

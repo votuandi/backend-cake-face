@@ -13,14 +13,20 @@ export class CakeFaceEntity {
   @Column({ type: 'text' })
   detail: string
 
-  @Column({ type: 'text' })
+  @Column({ type: 'longtext' })
   content: string
 
   @Column({ type: 'varchar', length: 500 })
   thumbnail: string
 
-  @Column({ type: 'varchar', length: 500 })
+  @Column({ type: 'varchar', length: 100, default: '' })
+  store: string
+
+  @Column({ type: 'text' })
   configFilePath: string
+
+  @Column({ type: 'boolean', default: false })
+  isTrendy: boolean
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean

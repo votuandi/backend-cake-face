@@ -35,11 +35,15 @@ export class CakeFaceController {
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'thumbnail', maxCount: 1 },
-      { name: 'configFile', maxCount: 1 },
+      { name: 'configFile', maxCount: 10 },
     ]),
   )
   async create(
-    @UploadedFiles() files: { thumbnail?: Express.Multer.File[]; configFile?: Express.Multer.File[] },
+    @UploadedFiles()
+    files: {
+      thumbnail?: Express.Multer.File[]
+      configFile?: Express.Multer.File[]
+    },
     @Body() createCakeFaceDto: CreateCakeFaceDto,
     @Request() req,
     @Res() res: Response,
@@ -48,7 +52,9 @@ export class CakeFaceController {
       console.log('CREATE CF')
 
       let thumbnail = files.thumbnail[0]
-      let configFile = files.configFile[0]
+      let configFile = files.configFile
+
+      console.log(files)
 
       let requester = req?.user?.userName
       if (!requester) {
@@ -59,7 +65,7 @@ export class CakeFaceController {
         res.status(HttpStatus.FORBIDDEN).json(response)
       }
 
-      if (!!thumbnail && !!configFile) {
+      if (!!thumbnail && configFile.length > 0) {
         let newCakeFace = await this.cakeFaceService.create(createCakeFaceDto, requester, thumbnail, configFile)
         if (newCakeFace === null) {
           let response: RESPONSE_TYPE = {
@@ -103,10 +109,12 @@ export class CakeFaceController {
     @Query('limit') limit: number,
     @Query('page') page: number,
     @Query('name') name: string,
-    @Query('categoryId') categoryId: number,
+    @Query('categoryId') categoryId: number | string,
     @Query('isActive') isActive: '0' | '1',
-    @Query('sortBy') sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount',
+    @Query('isTrendy') isTrendy: '0' | '1',
+    @Query('sortBy') sortBy: 'name' | 'createDate' | 'viewAmount' | 'downloadAmount' | 'isTrendy',
     @Query('sort') sort: 'ASC' | 'DESC',
+    @Request() req,
     @Res() res: Response,
   ) {
     try {
@@ -115,10 +123,15 @@ export class CakeFaceController {
       page = isNaN(page) || page <= 0 ? 1 : page
       name = name || ''
       sortBy =
-        sortBy !== 'name' && sortBy !== 'createDate' && sortBy !== 'viewAmount' && sortBy !== 'downloadAmount'
+        sortBy !== 'name' &&
+        sortBy !== 'createDate' &&
+        sortBy !== 'viewAmount' &&
+        sortBy !== 'downloadAmount' &&
+        sortBy !== 'isTrendy'
           ? 'name'
           : sortBy
-      sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
+      sort = sortBy === 'isTrendy' ? 'DESC' : sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
+      categoryId = categoryId === '' ? undefined : categoryId
 
       let cakeFaceListRes: CAKE_FACE_LIST_RES = await this.cakeFaceService.getList(
         limit,
@@ -126,6 +139,7 @@ export class CakeFaceController {
         name,
         categoryId,
         isActive,
+        isTrendy,
         sortBy,
         sort,
       )
@@ -270,6 +284,95 @@ export class CakeFaceController {
       let response: RESPONSE_TYPE = {
         status: true,
         message: 'Internal Server Error',
+      }
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+    }
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Put(':id/config/:index')
+  async removeConfigFile(@Param('id') id: string, @Param('index') index: string, @Request() req, @Res() res: Response) {
+    let requester = req?.user?.userName
+    if (!requester) {
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'Permission Deny',
+      }
+      res.status(HttpStatus.FORBIDDEN).json(response)
+    }
+    let success = await this.cakeFaceService.removeConfigFile(id, index, requester)
+    if (success === 1) {
+      let response: RESPONSE_TYPE = {
+        status: true,
+        message: `Successfully`,
+      }
+      res.status(HttpStatus.OK).json(response)
+    } else if (success === 0) {
+      let response: RESPONSE_TYPE = {
+        status: true,
+        message: 'Category not found',
+      }
+      res.status(HttpStatus.NOT_FOUND).json(response)
+    } else {
+      let response: RESPONSE_TYPE = {
+        status: true,
+        message: 'Internal Server Error',
+      }
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+    }
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Put(':id/config')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'configFile', maxCount: 10 }]))
+  async addConfigFiles(
+    @Param('id') id: string,
+    @UploadedFiles()
+    files: {
+      configFile?: Express.Multer.File[]
+    },
+    @Request() req,
+    @Res() res: Response,
+  ) {
+    try {
+      let configFile = files.configFile
+      if (configFile.length < 1) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Bad Request',
+        }
+        res.status(HttpStatus.BAD_REQUEST).json(response)
+      }
+
+      let requester = req?.user?.userName
+      if (!requester) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Permission deny',
+        }
+        res.status(HttpStatus.FORBIDDEN).json(response)
+      }
+
+      let result = await this.cakeFaceService.addConfigFiles(id, configFile, requester)
+      if (result > 0) {
+        let response: RESPONSE_TYPE = {
+          status: true,
+          message: 'Successfully',
+        }
+        res.status(HttpStatus.NO_CONTENT).json(response)
+      } else {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'INTERNAL_SERVER_ERROR',
+        }
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+      }
+    } catch (error) {
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'INTERNAL_SERVER_ERROR',
       }
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
     }

@@ -4,7 +4,7 @@ services:
   mysql:
     image: mysql:8.0
     ports:
-      - "3308:3306" # Map host port 3308 to container port 3306 for accessibility
+      - "3308:3306" # Map host port 3308 to container port 3306 for accessibility 3309 for server, 3308 for dev
     command: --default-authentication-plugin=mysql_native_password
     restart: always
     environment:
@@ -18,7 +18,7 @@ services:
   nestjs-app:
     build: .
     ports:
-      - "8080:8080" # Map host port 3000 to container port 3000 for application access
+      - "8443:8443" # 8443:8443 for server, 8080:8080 for dev
     restart: always
     environment:
       - DATABASE=face_cake_db
@@ -28,7 +28,7 @@ services:
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
       - MEDIA_UPLOAD_PATH=public/image
-      - API_HOST=http://127.0.0.1:8080
+      - API_HOST=http://127.0.0.1:8080 # http://127.0.0.1:8080 for dev, 
     depends_on:
       - mysql # Ensure MySQL is running before starting the NestJS app
     volumes:
