@@ -5,17 +5,17 @@ import { ValidationPipe } from '@nestjs/common'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import path from 'path'
 import { JwtExceptionFilter } from './auth/guards/jwt-exception.filter'
-import * as fs from 'fs'
+// import * as fs from 'fs'
 // import * as https from 'https'
 
 declare const module: any
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    httpsOptions: {
-      key: fs.readFileSync('./private.key'),
-      cert: fs.readFileSync('./bundle.crt'),
-    },
+    // httpsOptions: {
+    //   key: fs.readFileSync('./private.key'),
+    //   cert: fs.readFileSync('./bundle.crt'),
+    // },
   })
   app.useGlobalFilters(new JwtExceptionFilter())
 
@@ -29,8 +29,8 @@ async function bootstrap() {
   app.useStaticAssets(path.join(__dirname, '..', 'public'), {
     prefix: '/public/',
   })
-  // await app.listen(8080)
-  await app.listen(8443)
+  await app.listen(8080)
+  // await app.listen(8443)
 
   if (module.hot) {
     module.hot.accept()

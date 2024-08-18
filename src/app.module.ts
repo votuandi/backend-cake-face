@@ -10,6 +10,9 @@ import { CakeFaceCategoryModule } from './cake-face-category/cake-face-category.
 import { CakeFaceModule } from './cake-face/cake-face.module'
 import { CakeFaceOptionModule } from './cake-face-option/cake-face-option.module'
 import { BannerModule } from './banner/banner.module'
+import { SampleBackgroundModule } from './sample-background/sample-background.module'
+import { SamplePatternModule } from './sample-pattern/sample-pattern.module'
+import { SettingModule } from './setting/setting.module'
 
 @Module({
   imports: [
@@ -19,6 +22,9 @@ import { BannerModule } from './banner/banner.module'
     CakeFaceModule,
     CakeFaceOptionModule,
     BannerModule,
+    SampleBackgroundModule,
+    SamplePatternModule,
+    SettingModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
