@@ -130,7 +130,11 @@ export class CakeFaceController {
         sortBy !== 'isTrendy'
           ? 'name'
           : sortBy
-      sort = sortBy === 'isTrendy' ? 'DESC' : sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
+      sort = ['isTrendy', 'viewAmount', 'downloadAmount'].includes(sortBy)
+        ? 'DESC'
+        : sort !== 'ASC' && sort !== 'DESC'
+          ? 'ASC'
+          : sort
       categoryId = categoryId === '' ? undefined : categoryId
 
       let cakeFaceListRes: CAKE_FACE_LIST_RES = await this.cakeFaceService.getList(
@@ -253,6 +257,58 @@ export class CakeFaceController {
           params: cakeFace,
         }
         res.status(HttpStatus.OK).json(response)
+      }
+    } catch (error) {
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'Bad Request',
+      }
+      res.status(HttpStatus.BAD_REQUEST).json(response)
+    }
+  }
+
+  @Put(':id/rise-view')
+  async riseView(@Param('id') id: string, @Res() res: Response) {
+    try {
+      let result = await this.cakeFaceService.riseView(Number(id))
+      if (result) {
+        let response: RESPONSE_TYPE = {
+          status: true,
+          message: 'True',
+        }
+        res.status(HttpStatus.NO_CONTENT).json(response)
+      } else {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'False',
+        }
+        res.status(HttpStatus.NO_CONTENT).json(response)
+      }
+    } catch (error) {
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'Bad Request',
+      }
+      res.status(HttpStatus.BAD_REQUEST).json(response)
+    }
+  }
+
+  @Put(':id/rise-download')
+  async riseDownload(@Param('id') id: string, @Res() res: Response) {
+    try {
+      let result = await this.cakeFaceService.riseDownload(Number(id))
+      if (result) {
+        let response: RESPONSE_TYPE = {
+          status: true,
+          message: 'True',
+        }
+        res.status(HttpStatus.NO_CONTENT).json(response)
+      } else {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'False',
+        }
+        res.status(HttpStatus.NO_CONTENT).json(response)
       }
     } catch (error) {
       let response: RESPONSE_TYPE = {

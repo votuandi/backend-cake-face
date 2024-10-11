@@ -5,3 +5,4 @@ export class UpdateCakeFaceDto {
   readonly isActive?: '0' | '1'
   readonly categoryId?: string | number
 }
+

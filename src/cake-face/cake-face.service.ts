@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { CakeFaceCategoryEntity } from 'src/cake-face-category/cake-face-category.entity'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -221,6 +222,56 @@ export class CakeFaceService {
             .join(','),
         }
       } else return undefined
+    } catch (error) {
+      console.log('ERROR:', error)
+      return null
+    }
+  }
+
+  async riseView(cakeFaceId: number): Promise<boolean> {
+    try {
+      let currentCakeFace = await this.cakeFaceRepository.findOne({ where: { id: cakeFaceId } })
+      if (!currentCakeFace) {
+        return false
+      }
+
+      let { id, ...oldData } = currentCakeFace
+
+      console.log(oldData.viewAmount)
+
+      let updatedCakeFace = {
+        ...oldData,
+        viewAmount: oldData.viewAmount + 1,
+      }
+      let updateRes = await this.cakeFaceRepository.update(cakeFaceId, updatedCakeFace)
+      if (updateRes.affected > 0) {
+        return true
+      }
+      return false
+    } catch (error) {
+      console.log('ERROR:', error)
+      return null
+    }
+  }
+
+  async riseDownload(cakeFaceId: number): Promise<boolean> {
+    try {
+      let currentCakeFace = await this.cakeFaceRepository.findOne({ where: { id: cakeFaceId } })
+      if (!currentCakeFace) {
+        return false
+      }
+
+      let { id, ...oldData } = currentCakeFace
+
+      let updatedCakeFace = {
+        ...oldData,
+        downloadAmount: oldData.downloadAmount + 1,
+      }
+      let updateRes = await this.cakeFaceRepository.update(cakeFaceId, updatedCakeFace)
+      if (updateRes.affected > 0) {
+        return true
+      }
+      return false
     } catch (error) {
       console.log('ERROR:', error)
       return null

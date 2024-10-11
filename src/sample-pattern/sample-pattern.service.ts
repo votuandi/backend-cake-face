@@ -1,4 +1,4 @@
-import { UpdateSamplePatternDto } from './dto/update-sample-pattern.dto';
+import { UpdateSamplePatternDto } from './dto/update-sample-pattern.dto'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -8,7 +8,8 @@ import { Repository } from 'typeorm'
 import * as fs from 'fs'
 import { SamplePatternEntity } from './sample-pattern.entity'
 import { SAMPLE_PATTERN_RES } from 'src/types/commom'
-import { CreateSamplePatternDto } from './dto/create-sample-pattern.dto'
+import { CreateSamplePatternDto, HtmlToImageDto } from './dto/create-sample-pattern.dto'
+import * as puppeteer from 'puppeteer'
 
 @Injectable()
 export class SamplePatternService {
@@ -176,6 +177,23 @@ export class SamplePatternService {
       console.log('Id:', id)
       console.log('Error:', error)
       return -1
+    }
+  }
+
+  async convertHtmlToImage(htmlToImageDto: HtmlToImageDto): Promise<Buffer> {
+    try {
+      const browser = await puppeteer.launch({
+        executablePath: process.env.CHROME_BIN || '/usr/bin/chromium-browser',
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      })
+      const page = await browser.newPage()
+      await page.setContent(htmlToImageDto.content)
+      await page.setViewport({ width: htmlToImageDto.size, height: htmlToImageDto.size })
+      const screenshot = await page.screenshot({ type: 'png' })
+      await browser.close()
+      return Buffer.from(screenshot)
+    } catch (error) {
+      console.log('ERROR WHEN PARSE HTML TO IMAGE', error)
     }
   }
 

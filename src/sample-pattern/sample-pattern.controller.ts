@@ -22,7 +22,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { Roles } from 'src/auth/roles.decorator'
 import { Role } from 'src/auth/roles.enum'
 import { SamplePatternService } from './sample-pattern.service'
-import { CreateSamplePatternDto } from './dto/create-sample-pattern.dto'
+import { CreateSamplePatternDto, HtmlToImageDto } from './dto/create-sample-pattern.dto'
 import { UpdateSamplePatternDto } from './dto/update-sample-pattern.dto'
 
 @Controller('sample-pattern')
@@ -80,6 +80,43 @@ export class SamplePatternController {
     }
   }
 
+  @Post('download-sample')
+  async htmlToImage(@Body() htmlToImageDto: HtmlToImageDto, @Res() res: Response) {
+    try {
+      console.log(htmlToImageDto)
+
+      const image = await this.samplePatternService.convertHtmlToImage(htmlToImageDto)
+      res.setHeader('Content-Type', 'image/png')
+      if (image === null) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Internal Server Error',
+        }
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+      } else if (image === undefined) {
+        let response: RESPONSE_TYPE = {
+          status: false,
+          message: 'Create Sample Pattern failed',
+        }
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+      } else {
+        // let response: RESPONSE_TYPE = {
+        //   status: false,
+        //   message: 'Create Sample Pattern failed',
+        //   params: image
+        // }
+        res.status(HttpStatus.OK).send(image)
+      }
+    } catch (error) {
+      console.log(error)
+      let response: RESPONSE_TYPE = {
+        status: false,
+        message: 'Internal Server Error',
+      }
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
+    }
+  }
+
   @Get()
   async getList(
     @Query('limit') limit: number,
@@ -97,7 +134,7 @@ export class SamplePatternController {
       name = name || ''
       sortBy = sortBy !== 'name' && sortBy !== 'createDate' ? 'name' : sortBy
       sort = sort !== 'ASC' && sort !== 'DESC' ? 'ASC' : sort
-  
+
       let samplePatternList: SAMPLE_PATTERN_RES = await this.samplePatternService.getList(
         limit,
         page,
@@ -119,7 +156,6 @@ export class SamplePatternController {
         }
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
       }
-      
     } catch (error) {
       let response: RESPONSE_TYPE = {
         status: false,
@@ -152,7 +188,6 @@ export class SamplePatternController {
         }
         res.status(HttpStatus.OK).json(response)
       }
-      
     } catch (error) {
       let response: RESPONSE_TYPE = {
         status: false,
@@ -173,8 +208,8 @@ export class SamplePatternController {
     @Request() req,
     @Res() res: Response,
   ) {
-    try { 
-      console.log('UPDATE SP');
+    try {
+      console.log('UPDATE SP')
 
       let requester = req?.user?.userName
       if (!requester) {
@@ -241,7 +276,6 @@ export class SamplePatternController {
         }
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(response)
       }
-      
     } catch (error) {
       let response: RESPONSE_TYPE = {
         status: true,
